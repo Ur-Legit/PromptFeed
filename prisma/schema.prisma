@@ -1,0 +1,50 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+// SQLite for local dev. To use Postgres, change provider to "postgresql",
+// point DATABASE_URL at your database, and swap the adapter in src/lib/db.ts.
+datasource db {
+  provider = "sqlite"
+}
+
+// Each browser gets an anonymous user until real auth is added.
+model User {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  feeds     Feed[]
+}
+
+model Feed {
+  id                   String     @id @default(cuid())
+  userId               String
+  user                 User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  prompt               String
+  title                String
+  // JSON array of search queries Claude derived from the prompt
+  queries              String
+  refreshIntervalHours Int        @default(3)
+  lastRefreshedAt      DateTime?
+  lastError            String?
+  createdAt            DateTime   @default(now())
+  items                FeedItem[]
+
+  @@index([userId])
+}
+
+model FeedItem {
+  id          String    @id @default(cuid())
+  feedId      String
+  feed        Feed      @relation(fields: [feedId], references: [id], onDelete: Cascade)
+  url         String
+  title       String
+  source      String?
+  summary     String
+  whyRelevant String?
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@unique([feedId, url])
+  @@index([feedId, createdAt])
+}

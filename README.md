@@ -1,36 +1,60 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# PromptFeed
 
-## Getting Started
+Write a prompt, get a feed. Each prompt becomes its own news feed that PromptFeed keeps fresh through the day. Make as many feeds as you want.
 
-First, run the development server:
+## How it works
+
+1. **Create a feed.** Claude reads your prompt and turns it into a feed title and 3-5 news search queries.
+2. **Gather.** On each refresh, PromptFeed pulls recent articles for those queries from Google News RSS (free, no key).
+3. **Curate.** Claude picks the items that actually match your prompt, writes a short summary and a "why it's relevant" note for each, skips stories already in your feed, and can use web search to add related content beyond the news results.
+4. **Stay fresh.** Every feed has a refresh interval (1-24h, default 3h). Feeds refresh when you open them past their interval, when you click **Refresh now**, and on a schedule via `/api/cron/refresh`.
+
+## Stack
+
+- **Next.js 16** (App Router, server actions) + TypeScript + Tailwind
+- **Prisma 7** with SQLite locally (swap to Postgres for deployment, see below)
+- **Claude API** (`claude-opus-5-5`) via `@anthropic-ai/sdk`, with web search and server-side refusal fallback
+- **Google News RSS** for news candidates
+
+Users are anonymous for now: each browser gets its own ID cookie and its own feeds. Real sign-in is a planned next step.
+
+## Run it locally
 
 ```bash
+npm install
+cp .env.example .env      # then fill in ANTHROPIC_API_KEY
+npx prisma migrate dev    # creates dev.db
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Environment variables
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Name | What it's for |
+| --- | --- |
+| `ANTHROPIC_API_KEY` | Your key from https://console.anthropic.com |
+| `DATABASE_URL` | `file:./dev.db` for SQLite |
+| `CRON_SECRET` | Any random string; the scheduled refresh endpoint requires `Authorization: Bearer <CRON_SECRET>` |
 
-## Learn More
+### Scheduled refresh
 
-To learn more about Next.js, take a look at the following resources:
+`GET /api/cron/refresh` refreshes every feed whose interval has passed. On Vercel, `vercel.json` calls it hourly (Vercel sends the `CRON_SECRET` header automatically). Anywhere else, point any cron at it:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+curl -H "Authorization: Bearer $CRON_SECRET" https://your-app/api/cron/refresh
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Deploying
 
-## Deploy on Vercel
+SQLite doesn't persist on serverless hosts. To deploy (e.g. Vercel + Neon/Supabase Postgres):
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. In `prisma/schema.prisma` set `provider = "postgresql"` and delete `prisma/migrations`.
+2. `npm install @prisma/adapter-pg` and in `src/lib/db.ts` replace `PrismaBetterSqlite3` with `PrismaPg({ connectionString: process.env.DATABASE_URL })`.
+3. Run `npx prisma migrate dev --name init` against the Postgres database.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Tests
+
+```bash
+npm test
+```
