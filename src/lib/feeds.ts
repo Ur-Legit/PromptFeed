@@ -25,11 +25,12 @@ export function feedQueries(feed: { queries: string }): string[] {
 
 export function isDue(feed: {
   lastRefreshedAt: Date | null;
-  refreshIntervalHours: number;
+  refreshIntervalMinutes: number;
 }) {
   if (!feed.lastRefreshedAt) return true;
   const ageMs = Date.now() - feed.lastRefreshedAt.getTime();
-  return ageMs >= feed.refreshIntervalHours * 60 * 60 * 1000;
+  // A couple of minutes of slack so a 30-minute schedule doesn't skip feeds that are seconds short.
+  return ageMs >= (feed.refreshIntervalMinutes - 2) * 60 * 1000;
 }
 
 /** Fetches fresh candidates, has Claude curate them, and stores new items. Returns how many were added. */
@@ -96,20 +97,26 @@ export async function refreshFeed(feedId: string): Promise<number> {
   }
 }
 
-/** Refreshes every feed whose interval has elapsed. Used by the scheduled job. */
-export async function refreshDueFeeds() {
-  const feeds = await db.feed.findMany();
-  const due = feeds.filter(isDue);
-  const results = [];
-  for (const feed of due) {
-    try {
-      results.push({ id: feed.id, added: await refreshFeed(feed.id) });
-    } catch (err) {
-      results.push({
-        id: feed.id,
-        error: err instanceof Error ? err.message : String(err),
-      });
+/**
+ * Refreshes feeds whose interval has elapsed, most overdue first, a few at a time.
+ * Stops starting new feeds after `budgetMs` so the request finishes inside the
+ * host's time limit; anything left over is picked up by the next run.
+ */
+export async function refreshDueFeeds({ concurrency = 4, budgetMs = 200_000 } = {}) {
+  const started = Date.now();
+  const feeds = await db.feed.findMany({ orderBy: { lastRefreshedAt: { sort: "asc", nulls: "first" } } });
+  const queue = feeds.filter(isDue);
+  const results: { id: string; added?: number; error?: string }[] = [];
+  async function worker() {
+    for (let feed = queue.shift(); feed; feed = queue.shift()) {
+      if (Date.now() - started > budgetMs) return;
+      try {
+        results.push({ id: feed.id, added: await refreshFeed(feed.id) });
+      } catch (err) {
+        results.push({ id: feed.id, error: err instanceof Error ? err.message : String(err) });
+      }
     }
   }
-  return { checked: feeds.length, refreshed: results };
+  await Promise.all(Array.from({ length: concurrency }, worker));
+  return { checked: feeds.length, refreshed: results, deferred: queue.length };
 }
