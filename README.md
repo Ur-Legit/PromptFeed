@@ -53,6 +53,12 @@ SQLite doesn't persist on serverless hosts. To deploy (e.g. Vercel + Neon/Supaba
 2. `npm install @prisma/adapter-pg` and in `src/lib/db.ts` replace `PrismaBetterSqlite3` with `PrismaPg({ connectionString: process.env.DATABASE_URL })`.
 3. Run `npx prisma migrate dev --name init` against the Postgres database.
 
+## Hosted version
+
+`hosted/index.html` is the single-page version that runs as a Claude artifact (https://claude.ai/artifact/12YjgmXiHCrssCQE6VdLXc). It stores feeds and stories in the artifact's database, uses the artifact's `sample` capability to plan a feed's title and searches, and relies on an hourly Claude routine to search the web and fill feeds. "Refresh now" fires that routine on demand through the `mcp` capability. It only runs inside claude.ai; opened on its own it shows a notice.
+
+Features not yet in the Next.js app: editing a feed's prompt, searches and refresh schedule from a modal.
+
 ## Tests
 
 ```bash
