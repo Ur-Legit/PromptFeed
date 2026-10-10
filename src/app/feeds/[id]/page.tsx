@@ -41,7 +41,7 @@ async function Feed({ params }: { params: Promise<{ id: string }> }) {
         <p className="text-xs text-stone-400">Last updated {timeAgo(feed.lastRefreshedAt)}</p>
       </section>
 
-      <FeedControls feedId={feed.id} due={isDue(feed)} intervalHours={feed.refreshIntervalHours} />
+      <FeedControls feedId={feed.id} due={isDue(feed)} intervalMinutes={feed.refreshIntervalMinutes} />
 
       {feed.lastError && (
         <p className="rounded-lg border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950 px-3 py-2 text-sm text-red-700 dark:text-red-300">

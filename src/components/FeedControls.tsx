@@ -4,10 +4,12 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { deleteFeedAction, refreshFeedAction, updateIntervalAction } from "@/app/actions";
 
-const INTERVALS = [1, 3, 6, 12, 24];
+// Minutes. The scheduled job runs every 30 minutes, so 30 is the shortest that works.
+const INTERVALS = [30, 60, 180, 360, 720, 1440];
+const label = (m: number) => (m < 60 ? `${m}m` : `${m / 60}h`);
 
-export function FeedControls(props: { feedId: string; due: boolean; intervalHours: number }) {
-  const { feedId, due, intervalHours } = props;
+export function FeedControls(props: { feedId: string; due: boolean; intervalMinutes: number }) {
+  const { feedId, due, intervalMinutes } = props;
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [notice, setNotice] = useState<string | null>(null);
@@ -44,15 +46,15 @@ export function FeedControls(props: { feedId: string; due: boolean; intervalHour
       <label className="flex items-center gap-2 text-stone-500">
         Refresh every
         <select
-          defaultValue={intervalHours}
+          defaultValue={intervalMinutes}
           onChange={(e) =>
             startTransition(() => updateIntervalAction(feedId, Number(e.target.value)))
           }
           className="rounded-md border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-900 px-2 py-1"
         >
-          {INTERVALS.map((h) => (
-            <option key={h} value={h}>
-              {h}h
+          {INTERVALS.map((m) => (
+            <option key={m} value={m}>
+              {label(m)}
             </option>
           ))}
         </select>

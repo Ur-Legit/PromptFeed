@@ -45,10 +45,10 @@ export async function refreshFeedAction(
   }
 }
 
-export async function updateIntervalAction(feedId: string, hours: number) {
+export async function updateIntervalAction(feedId: string, minutes: number) {
   await ownedFeed(feedId);
-  const clamped = Math.min(24, Math.max(1, Math.round(hours)));
-  await db.feed.update({ where: { id: feedId }, data: { refreshIntervalHours: clamped } });
+  const clamped = Math.min(24 * 60, Math.max(30, Math.round(minutes)));
+  await db.feed.update({ where: { id: feedId }, data: { refreshIntervalMinutes: clamped } });
   revalidatePath(`/feeds/${feedId}`);
 }
 

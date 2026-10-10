@@ -3,10 +3,8 @@ generator client {
   output   = "../src/generated/prisma"
 }
 
-// SQLite for local dev. To use Postgres, change provider to "postgresql",
-// point DATABASE_URL at your database, and swap the adapter in src/lib/db.ts.
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
 }
 
 // Each browser gets an anonymous user until real auth is added.
@@ -24,7 +22,7 @@ model Feed {
   title                String
   // JSON array of search queries Claude derived from the prompt
   queries              String
-  refreshIntervalHours Int        @default(3)
+  refreshIntervalMinutes Int      @default(180)
   lastRefreshedAt      DateTime?
   lastError            String?
   createdAt            DateTime   @default(now())
