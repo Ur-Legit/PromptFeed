@@ -1,0 +1,574 @@
+<title>PromptFeed</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a feed rail on the left (chips on phones), the reading column on the right. */
+:root {
+  --bg: #f5f6fa;
+  --surface: #ffffff;
+  --ink: #141726;
+  --muted: #5d6378;
+  --faint: #8b90a3;
+  --line: #e1e3ec;
+  --accent: #2c3fd1;
+  --accent-ink: #ffffff;
+  --accent-soft: #e6e9fb;
+  --live: #0f8a5f;
+  --warn: #b4402a;
+  --display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --body: "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d0f17; --surface: #151827; --ink: #e8eaf3; --muted: #a2a7bd; --faint: #737891;
+    --line: #262a3d; --accent: #8f9cff; --accent-ink: #0d0f17; --accent-soft: #1f2440;
+    --live: #4fd1a1; --warn: #ff8a73; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d0f17; --surface: #151827; --ink: #e8eaf3; --muted: #a2a7bd; --faint: #737891;
+  --line: #262a3d; --accent: #8f9cff; --accent-ink: #0d0f17; --accent-soft: #1f2440;
+  --live: #4fd1a1; --warn: #ff8a73; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.55 var(--body); }
+button, input, textarea, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wrap { max-width: 1120px; margin: 0 auto; padding-inline: 16px; padding-block: 20px 48px; }
+
+header.top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
+.brand { font: 700 26px/1 var(--display); letter-spacing: -0.02em; }
+.brand span { color: var(--accent); }
+.tag { color: var(--muted); font-size: 14px; }
+
+.layout { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 32px; padding-top: 24px; }
+@media (max-width: 760px) { .layout { grid-template-columns: minmax(0, 1fr); gap: 20px; } }
+
+/* Rail */
+.rail { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.composer { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.composer label { font: 600 12px/1 var(--body); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.composer textarea { width: 100%; min-height: 76px; resize: vertical; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); padding: 8px 10px; line-height: 1.45; }
+.btn { border: 0; border-radius: 8px; padding: 8px 14px; font-weight: 600; background: var(--accent); color: var(--accent-ink); }
+.btn:disabled { opacity: 0.55; cursor: default; }
+.btn.ghost { background: transparent; color: var(--muted); border: 1px solid var(--line); font-weight: 500; }
+.btn.ghost:hover { color: var(--ink); }
+.btn.danger { background: var(--warn); color: var(--accent-ink); }
+.sched { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--muted); }
+.sched select { border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink); padding: 5px 6px; }
+.sched select:focus { border-color: var(--accent); outline: none; }
+.composer .sched label { font: inherit; letter-spacing: 0; text-transform: none; }
+.composer-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.modal .sched { border-top: 1px solid var(--line); padding-top: 12px; }
+.hint { font-size: 13px; color: var(--muted); }
+.err { font-size: 13px; color: var(--warn); }
+
+.rail h2 { font: 600 12px/1 var(--body); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin: 6px 0 0; }
+.feedlist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.feedlist button.pick { flex: 1; min-width: 0; width: 100%; text-align: left; background: transparent; border: 0; border-radius: 8px; padding: 9px 10px; display: flex; flex-direction: column; gap: 2px; }
+.feedlist .name { font-weight: 600; display: flex; align-items: center; gap: 8px; min-width: 0; }
+.feedlist .name b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.feedlist .meta { font: 12px/1.3 var(--mono); color: var(--faint); }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); flex: none; }
+.dot.live { background: var(--live); }
+.dot.busy { background: var(--accent); animation: pulse 1.2s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: 0.3; } }
+@media (prefers-reduced-motion: reduce) { .dot.busy { animation: none; } }
+@media (max-width: 760px) {
+  .feedlist { flex-direction: row; overflow-x: auto; gap: 6px; padding-bottom: 4px; }
+  .feedlist li { flex: none; }
+  .feedlist li { border: 1px solid var(--line); max-width: 250px; }
+}
+
+/* Reading column */
+.main { min-width: 0; }
+.feedhead { display: flex; flex-direction: column; gap: 8px; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
+.feedhead h1 { font: 700 clamp(26px, 4vw, 34px)/1.1 var(--display); letter-spacing: -0.02em; margin: 0; text-wrap: balance; }
+.prompt { color: var(--muted); margin: 0; max-width: 65ch; }
+.promptrow { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+.linkbtn { background: none; border: 0; padding: 0; color: var(--accent); font-size: 14px; font-weight: 600; }
+.linkbtn:hover { text-decoration: underline; }
+.editicon { flex: none; width: 30px; height: 30px; display: grid; place-items: center; border: 0; border-radius: 6px; background: transparent; color: var(--faint); font-size: 14px; }
+.editicon:hover { color: var(--accent); background: var(--accent-soft); }
+.feedlist li { display: flex; align-items: center; gap: 2px; border-radius: 8px; }
+.feedlist li:hover { background: var(--surface); }
+.feedlist li[aria-current="true"] { background: var(--accent-soft); }
+.feedlist li .editicon { margin-right: 4px; opacity: 0.55; }
+.feedlist li:hover .editicon, .feedlist li[aria-current="true"] .editicon, .feedlist .editicon:focus-visible { opacity: 1; }
+@media (hover: none) { .feedlist li .editicon { opacity: 1; } }
+.modal-backdrop { position: fixed; inset: 0; z-index: 10; background: rgb(10 12 22 / 0.45); display: grid; place-items: center; padding: 16px; }
+.modal-backdrop[hidden] { display: none; }
+.modal { width: min(560px, 100%); background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 18px 50px rgb(10 12 22 / 0.25); }
+.modal-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.eyebrow { font: 600 12px/1 var(--body); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.modal-feed { font: 700 22px/1.2 var(--display); margin-top: 6px; text-wrap: balance; }
+.modal textarea { width: 100%; resize: vertical; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); padding: 10px 12px; line-height: 1.5; }
+.modal textarea:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px var(--accent-soft); }
+.modal .hint { margin: 0; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.tags { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--line); padding-top: 12px; }
+.tags-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.tags .hint { margin: 0; }
+.taglist { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { display: inline-flex; align-items: center; border: 1px solid var(--line); background: var(--bg); border-radius: 999px; padding-left: 10px; max-width: 100%; }
+.chip:focus-within { border-color: var(--accent); }
+.chip input { font: 12px/1.2 var(--mono); border: 0; background: transparent; padding: 6px 0; min-width: 4ch; max-width: 100%; }
+.chip input:focus { outline: none; }
+.chip button { border: 0; background: transparent; color: var(--faint); width: 26px; height: 26px; border-radius: 50%; font-size: 13px; }
+.chip button:hover { color: var(--warn); }
+.tagadd { display: flex; gap: 8px; }
+.tagadd input { flex: 1; min-width: 0; font: 13px/1.3 var(--mono); border: 1px solid var(--line); border-radius: 8px; background: var(--bg); padding: 7px 10px; }
+.tagadd input:focus { border-color: var(--accent); outline: none; }
+.modal { max-height: calc(100% - 32px); overflow-y: auto; }
+.controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-size: 14px; }
+.controls select { border: 1px solid var(--line); border-radius: 6px; background: var(--surface); padding: 4px 6px; }
+.controls .spacer { flex: 1; }
+.status { font: 12px/1.4 var(--mono); color: var(--faint); display: flex; align-items: center; gap: 8px; }
+.notice { font-size: 14px; color: var(--muted); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+.notice.bad { color: var(--warn); }
+
+.items { list-style: none; margin: 0; padding: 0; }
+.item { padding: 18px 0; border-bottom: 1px solid var(--line); display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 16px; }
+@media (max-width: 520px) { .item { grid-template-columns: minmax(0, 1fr); gap: 4px; } }
+.when { font: 12px/1.5 var(--mono); color: var(--faint); padding-top: 3px; font-variant-numeric: tabular-nums; }
+.item a.title { font: 600 18px/1.3 var(--display); color: var(--ink); text-decoration: none; text-wrap: balance; }
+.item a.title:hover { color: var(--accent); }
+.item .source { font-size: 13px; color: var(--muted); margin-top: 2px; }
+.item p { margin: 6px 0 0; max-width: 65ch; }
+.item .why { font-size: 13px; color: var(--muted); }
+.item .why::before { content: "Why it's here: "; font-weight: 600; color: var(--ink); }
+
+.empty { padding: 48px 0; color: var(--muted); max-width: 52ch; display: flex; flex-direction: column; gap: 10px; }
+.empty h1 { font: 700 30px/1.1 var(--display); color: var(--ink); margin: 0; }
+.examples { display: flex; flex-wrap: wrap; gap: 8px; }
+.examples button { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 6px 12px; font-size: 13px; color: var(--muted); }
+.examples button:hover { border-color: var(--accent); color: var(--ink); }
+.confirm { display: inline-flex; gap: 8px; align-items: center; }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">Prompt<span>Feed</span></div>
+  </header>
+
+  <div class="layout">
+    <aside class="rail">
+      <form class="composer" id="composer">
+        <label for="prompt">New feed</label>
+        <textarea id="prompt" name="prompt" maxlength="1000" placeholder="e.g. Fusion energy startups and their funding rounds"></textarea>
+        <div class="composer-foot">
+          <div class="sched">
+            <label for="new-interval">Refresh every</label>
+            <select id="new-interval"><option value="1">1h</option><option value="3" selected>3h</option><option value="6">6h</option><option value="12">12h</option><option value="24">24h</option></select>
+          </div>
+          <button class="btn" id="create" type="submit">Create feed</button>
+        </div>
+        <div class="err" id="composer-err" hidden></div>
+      </form>
+      <h2 id="feeds-label">Your feeds</h2>
+      <ul class="feedlist" id="feedlist" aria-labelledby="feeds-label"></ul>
+    </aside>
+
+    <main class="main" id="main">
+      <div class="empty">
+        <h1>Loading your feeds…</h1>
+      </div>
+    </main>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-head">
+      <div>
+        <div class="eyebrow" id="modal-title">Edit feed</div>
+        <div class="modal-feed" id="modal-feed"></div>
+      </div>
+      <button class="editicon" id="edit-close" type="button" aria-label="Close">&#x2715;</button>
+    </div>
+    <label class="sr" for="edit-prompt">Feed prompt</label>
+    <textarea id="edit-prompt" maxlength="1000" rows="5"></textarea>
+    <div class="sched">
+      <label for="edit-interval">Refresh every</label>
+      <select id="edit-interval"><option value="1">1h</option><option value="3" selected>3h</option><option value="6">6h</option><option value="12">12h</option><option value="24">24h</option></select>
+    </div>
+    <section class="tags" aria-labelledby="tags-title">
+      <div class="tags-head">
+        <div class="eyebrow" id="tags-title">Searches</div>
+        <button class="linkbtn" id="tags-auto" type="button">Regenerate</button>
+      </div>
+      <ul class="taglist" id="taglist"></ul>
+      <div class="tagadd">
+        <label class="sr" for="tag-new">Add a search</label>
+        <input id="tag-new" type="text" maxlength="80" placeholder="Add a search, e.g. Helion Polaris">
+        <button class="btn ghost" id="tag-add" type="button">Add</button>
+      </div>
+    </section>
+    <div class="err" id="edit-err" hidden></div>
+    <div class="modal-actions">
+      <button class="btn ghost" id="edit-cancel" type="button">Cancel</button>
+      <button class="btn" id="edit-save" type="button">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// Routine that fetches news for every feed. Fired on demand by "Refresh now".
+const TRIGGER_ID = "trig_013b1QLSt4cC715niZhVCdU3";
+const REMOTE = "Claude Code Remote";
+const EXAMPLES = [
+  "Fusion energy startups and their funding rounds",
+  "New open-weight AI models and benchmark results",
+  "Arsenal transfer rumors and injury news",
+  "Housing and zoning policy in California",
+];
+const INTERVALS = [1, 3, 6, 12, 24];
+const PENCIL = '<svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M13.6 3.2a1.8 1.8 0 0 1 2.6 0l.6.6a1.8 1.8 0 0 1 0 2.6l-9 9-3.6 1 1-3.6 8.4-8.6Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M12.2 4.6l3.2 3.2" stroke="currentColor" stroke-width="1.6"/></svg>';
+
+const S = { db: null, sample: null, feeds: [], items: [], selected: null,
+            loaded: false, unavailable: false, itemsUnsub: null, notice: null, confirmDelete: false,
+            editing: false, saving: false, fired: new Set() };
+
+const $ = (sel) => document.querySelector(sel);
+const el = (tag, attrs = {}, ...kids) => {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") n.className = v;
+    else if (k.startsWith("on")) n.addEventListener(k.slice(2), v);
+    else if (v === true) n.setAttribute(k, "");
+    else if (v !== false && v != null) n.setAttribute(k, v);
+  }
+  for (const kid of kids.flat()) if (kid != null && kid !== false) n.append(kid);
+  return n;
+};
+
+function ago(ms) {
+  if (!ms) return "never";
+  const s = Math.round((Date.now() - ms) / 1000);
+  if (s < 60) return "just now";
+  const m = Math.round(s / 60); if (m < 60) return m + "m ago";
+  const h = Math.round(m / 60); if (h < 24) return h + "h ago";
+  return Math.round(h / 24) + "d ago";
+}
+function shortWhen(ms) {
+  if (!ms) return "";
+  const d = new Date(ms), now = new Date();
+  const sameDay = d.toDateString() === now.toDateString();
+  return sameDay ? d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+                 : d.toLocaleDateString([], { month: "short", day: "numeric" });
+}
+const isBusy = (f) => (f.refreshRequestedAt || 0) > (f.lastRefreshedAt || 0);
+
+// ---------- Rendering ----------
+
+function renderRail() {
+  const list = $("#feedlist");
+  list.replaceChildren(...S.feeds.map((f) => {
+    const dot = isBusy(f) ? "dot busy" : f.lastRefreshedAt ? "dot live" : "dot";
+    const icon = el("button", { type: "button", class: "editicon", title: "Edit prompt",
+      "aria-label": `Edit prompt for ${f.title || "feed"}`, onclick: () => openEditor(f.id) });
+    icon.innerHTML = PENCIL;
+    return el("li", { "aria-current": String(f.id === S.selected) }, el("button", {
+      type: "button", class: "pick", "aria-current": String(f.id === S.selected),
+      onclick: () => select(f.id),
+    },
+      el("span", { class: "name" }, el("span", { class: dot }), el("b", {}, f.title || f.prompt)),
+      el("span", { class: "meta" }, isBusy(f) ? "queued" : `${f.itemCount ?? 0} items · ${ago(f.lastRefreshedAt)}`)
+    ), icon);
+  }));
+  $("#feeds-label").hidden = S.feeds.length === 0;
+}
+
+function renderMain() {
+  const main = $("#main");
+  if (S.unavailable) {
+    main.replaceChildren(el("div", { class: "empty" },
+      el("h1", {}, "Open PromptFeed on claude.ai"),
+      el("p", {}, "Your feeds are stored with this page on claude.ai. Open it there while signed in to create and read feeds.")));
+    return;
+  }
+  if (!S.loaded) return;
+  const feed = S.feeds.find((f) => f.id === S.selected);
+  if (!feed) {
+    main.replaceChildren(el("div", { class: "empty" },
+      el("h1", {}, "Make a feed from a prompt"),
+      el("div", { class: "examples" }, EXAMPLES.map((ex) =>
+        el("button", { type: "button", onclick: () => { $("#prompt").value = ex; $("#prompt").focus(); } }, ex)))));
+    return;
+  }
+
+  const busy = isBusy(feed);
+  const head = el("section", { class: "feedhead" },
+    el("h1", {}, feed.title || "New feed"),
+    el("p", { class: "prompt" }, feed.prompt),
+    el("div", { class: "controls" },
+      el("button", { class: "btn", type: "button", disabled: busy, onclick: () => requestRefresh(feed.id) },
+        busy ? (S.fired.has(feed.id) ? "Updating…" : "Queued") : "Refresh now"),
+      el("span", { class: "spacer" }),
+      S.confirmDelete
+        ? el("span", { class: "confirm" }, "Delete this feed?",
+            el("button", { class: "btn danger", type: "button", onclick: () => deleteFeed(feed.id) }, "Delete"),
+            el("button", { class: "btn ghost", type: "button", onclick: () => { S.confirmDelete = false; renderMain(); } }, "Keep"))
+        : el("button", { class: "btn ghost", type: "button", onclick: () => { S.confirmDelete = true; renderMain(); } }, "Delete feed")),
+    el("div", { class: "status" },
+      el("span", { class: busy ? "dot busy" : feed.lastRefreshedAt ? "dot live" : "dot" }),
+      busy ? (S.fired.has(feed.id) ? "Updating…" : "Queued for the next hourly update")
+           : `Updated ${ago(feed.lastRefreshedAt)} · next check within ${feed.intervalHours || 3}h`),
+  );
+
+  const parts = [head];
+  if (S.notice) parts.push(el("div", { class: "notice" + (S.notice.bad ? " bad" : "") }, S.notice.text));
+  if (feed.lastError) parts.push(el("div", { class: "notice bad" }, "Last refresh had a problem: " + feed.lastError));
+
+  if (S.items.length === 0) {
+    parts.push(el("div", { class: "empty" },
+      el("p", {}, "No stories yet.")));
+  } else {
+    parts.push(el("ul", { class: "items" }, S.items.map((it) =>
+      el("li", { class: "item" },
+        el("div", { class: "when" }, shortWhen(it.publishedAt || it.addedAt)),
+        el("div", {},
+          el("a", { class: "title", href: it.url, target: "_blank", rel: "noopener noreferrer" }, it.title),
+          it.source ? el("div", { class: "source" }, it.source) : null,
+          el("p", {}, it.summary),
+          it.whyRelevant ? el("p", { class: "why" }, it.whyRelevant) : null)))));
+  }
+  main.replaceChildren(...parts);
+}
+
+// ---------- Prompt editor (modal) ----------
+
+let lastFocus = null;
+const MAX_TAGS = 10;
+const E = { tags: [], original: [], auto: false };  // auto: tags will be rewritten by Claude on save
+
+const sameTags = (a, b) => a.length === b.length && a.every((t, i) => t === b[i]);
+const cleanTags = (tags) => [...new Set(tags.map((t) => t.trim()).filter(Boolean))];
+
+function renderTags() {
+  const list = $("#taglist");
+  list.replaceChildren(...E.tags.map((t, i) => {
+    const input = el("input", { type: "text", maxlength: "80", "aria-label": `Search ${i + 1}`, size: String(Math.max(4, t.length)) });
+    input.value = t;
+    input.addEventListener("input", () => { E.tags[i] = input.value; E.auto = false; input.size = Math.max(4, input.value.length); updateTagHint(); });
+    return el("li", { class: "chip" }, input,
+      el("button", { type: "button", "aria-label": `Remove ${t}`, onclick: () => { E.tags.splice(i, 1); E.auto = false; renderTags(); } }, "\u2715"));
+  }));
+  $("#tag-add").disabled = E.tags.length >= MAX_TAGS;
+  $("#tag-new").disabled = E.tags.length >= MAX_TAGS;
+  updateTagHint();
+}
+function updateTagHint() {
+  $("#tags-auto").hidden = E.auto;
+}
+function addTag() {
+  const box = $("#tag-new");
+  const t = box.value.trim();
+  if (!t || E.tags.length >= MAX_TAGS) return;
+  if (!E.tags.some((x) => x.trim().toLowerCase() === t.toLowerCase())) E.tags.push(t);
+  E.auto = false; box.value = ""; renderTags(); box.focus();
+}
+$("#tag-add").addEventListener("click", addTag);
+$("#tag-new").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addTag(); } });
+$("#tags-auto").addEventListener("click", () => { E.auto = true; E.tags = []; renderTags(); });
+
+function openEditor(feedId) {
+  const feed = S.feeds.find((f) => f.id === feedId);
+  if (!feed) return;
+  S.editing = feedId; S.confirmDelete = false;
+  lastFocus = document.activeElement;
+  $("#modal-feed").textContent = feed.title || "Feed";
+  $("#edit-prompt").value = feed.prompt;
+  $("#edit-interval").value = String(INTERVALS.includes(feed.intervalHours) ? feed.intervalHours : 3);
+  E.original = [...(feed.queries || [])]; E.tags = [...E.original]; E.auto = false;
+  $("#tag-new").value = "";
+  renderTags();
+  $("#edit-err").hidden = true;
+  setSaving(false);
+  $("#modal").hidden = false;
+  const ta = $("#edit-prompt");
+  ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length);
+}
+function closeEditor() {
+  if (S.saving) return;
+  S.editing = false;
+  $("#modal").hidden = true;
+  lastFocus?.focus?.();
+}
+function setSaving(on) {
+  S.saving = on;
+  $("#edit-save").disabled = on; $("#edit-cancel").disabled = on;
+  $("#edit-save").textContent = on ? "Saving…" : "Save";
+}
+async function saveEditor() {
+  const feed = S.feeds.find((f) => f.id === S.editing);
+  const err = $("#edit-err");
+  if (!feed) { closeEditor(); return; }
+  const prompt = $("#edit-prompt").value.trim();
+  if (prompt.length < 3) { err.textContent = "Describe what you want to follow."; err.hidden = false; return; }
+  const tags = cleanTags(E.tags);
+  const promptChanged = prompt !== feed.prompt;
+  const tagsEdited = !E.auto && !sameTags(tags, E.original);
+  // Searches Claude wrote follow the prompt; searches the user touched are kept as written.
+  const replan = E.auto || (promptChanged && !tagsEdited && !feed.queriesCustom);
+  const hours = Number($("#edit-interval").value);
+  const intervalChanged = hours !== (feed.intervalHours || 3);
+  if (!promptChanged && !tagsEdited && !E.auto) {
+    if (intervalChanged) {
+      setSaving(true); err.hidden = true;
+      try { await setInterval_(feed.id, hours); }
+      catch { setSaving(false); err.textContent = "Couldn't save. Try again."; err.hidden = false; return; }
+      setSaving(false);
+    }
+    closeEditor(); return;
+  }
+  if (!replan && tags.length === 0) { err.textContent = "Add at least one search, or press Regenerate."; err.hidden = false; return; }
+  setSaving(true); err.hidden = true;
+  try {
+    const ref = S.db.doc(`feeds/${feed.id}`);
+    // Empty queries tell the refresh run to write them if Claude can't do it here.
+    await ref.update({ prompt, intervalHours: hours, queries: replan ? [] : tags, queriesCustom: !replan && (tagsEdited || !!feed.queriesCustom),
+                       refreshRequestedAt: Date.now(), lastError: null });
+    setSaving(false); closeEditor();
+    if (S.selected !== feed.id) select(feed.id);
+    S.notice = null; renderMain();
+    if (replan || promptChanged) {
+      const plan = await planWithClaude(prompt);
+      if (plan) await ref.update(replan ? plan : { title: plan.title });
+    }
+  } catch {
+    setSaving(false);
+    err.textContent = "Couldn't save the prompt. Try again."; err.hidden = false;
+  }
+}
+$("#edit-save").addEventListener("click", saveEditor);
+$("#edit-cancel").addEventListener("click", closeEditor);
+$("#edit-close").addEventListener("click", closeEditor);
+$("#modal").addEventListener("mousedown", (e) => { if (e.target.id === "modal") closeEditor(); });
+$("#modal").addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closeEditor();
+  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) saveEditor();
+  if (e.key === "Tab") {  // keep focus inside the dialog
+    const f = [...$("#modal").querySelectorAll("button:not(:disabled):not([hidden]), textarea, input:not(:disabled), select")];
+    const i = f.indexOf(document.activeElement);
+    if (e.shiftKey && i <= 0) { e.preventDefault(); f[f.length - 1].focus(); }
+    else if (!e.shiftKey && i === f.length - 1) { e.preventDefault(); f[0].focus(); }
+  }
+});
+
+function render() { renderRail(); renderMain(); }
+
+// ---------- Data ----------
+
+function select(id) {
+  if (S.selected === id && S.itemsUnsub) return;
+  S.selected = id; S.items = []; S.notice = null; S.confirmDelete = false;
+  try { localStorage.setItem("pf-selected", id); } catch {}
+  if (S.itemsUnsub) S.itemsUnsub();
+  S.itemsUnsub = null;
+  if (id && S.db) {
+    S.itemsUnsub = S.db.collection(`feeds/${id}/items`).orderBy("addedAt", "desc").limit(100)
+      .onSnapshot((snap) => { S.items = snap.docs.map((d) => ({ id: d.id, ...d.data() })); renderMain(); },
+                  () => { S.notice = { text: "Couldn't load this feed's stories. Reload the page to try again.", bad: true }; renderMain(); });
+  }
+  render();
+}
+
+async function fireRoutine(feedId) {
+  if (!S.mcp) return false;
+  try {
+    await S.mcp.callTool(REMOTE, "fire_trigger",
+      { trigger_id: TRIGGER_ID, text: `Feed ${feedId} was just requested by the user; refresh it first.` },
+      { cache: false });
+    return true;
+  } catch { return false; }
+}
+
+async function requestRefresh(feedId) {
+  S.notice = null;
+  // Marks the feed due, then starts the refresh job now; if that's declined, the hourly run picks it up.
+  await S.db.doc(`feeds/${feedId}`).update({ refreshRequestedAt: Date.now() });
+  if (await fireRoutine(feedId)) S.fired.add(feedId);
+  renderMain();
+}
+
+async function setInterval_(feedId, hours) {
+  await S.db.doc(`feeds/${feedId}`).update({ intervalHours: hours });
+}
+
+async function deleteFeed(feedId) {
+  S.confirmDelete = false;
+  const items = await S.db.collection(`feeds/${feedId}/items`).get();
+  await S.db.doc(`feeds/${feedId}`).delete();
+  for (const d of items.docs) await S.db.doc(`feeds/${feedId}/items/${d.id}`).delete();
+  S.selected = null;
+  select(S.feeds.find((f) => f.id !== feedId)?.id ?? null);
+}
+
+async function planWithClaude(prompt) {
+  if (!S.sample) return null;
+  try {
+    const plan = await S.sample.json(
+      `You set up a personalized news feed. The user wants to follow:\n"""${prompt}"""\n\n` +
+      `Reply with only JSON: {"title": "2-5 word feed name", "queries": ["3 to 5 specific news search queries that together cover it"]}`,
+      { modelTier: "quick" });
+    if (plan && typeof plan.title === "string" && Array.isArray(plan.queries)) {
+      return { title: plan.title.slice(0, 80), queries: plan.queries.map(String).slice(0, 6) };
+    }
+  } catch {}
+  return null;
+}
+
+async function createFeed(e) {
+  e.preventDefault();
+  const box = $("#prompt"), btn = $("#create"), err = $("#composer-err");
+  const prompt = box.value.trim();
+  err.hidden = true;
+  if (prompt.length < 3) { err.textContent = "Describe what you want to follow."; err.hidden = false; return; }
+  if (!S.db) { err.textContent = "Open this page on claude.ai to create feeds."; err.hidden = false; return; }
+  btn.disabled = true; btn.textContent = "Creating…";
+  try {
+    const ref = S.db.collection("feeds").doc();
+    const now = Date.now();
+    await ref.set({ prompt, title: prompt.length > 48 ? prompt.slice(0, 45) + "…" : prompt, queries: [],
+                    intervalHours: Number($("#new-interval").value) || 3, createdAt: now, refreshRequestedAt: now, lastRefreshedAt: 0, itemCount: 0 });
+    box.value = ""; $("#new-interval").value = "3";
+    select(ref.id);
+    const plan = await planWithClaude(prompt);
+    if (plan) await ref.update(plan);
+  } catch (x) {
+    err.textContent = x?.code === "quota_exceeded" ? "Storage is full. Delete a feed to make room." : "Couldn't save the feed. Try again.";
+    err.hidden = false;
+  } finally {
+    btn.disabled = false; btn.textContent = "Create feed";
+  }
+}
+
+$("#composer").addEventListener("submit", createFeed);
+
+(async () => {
+  const c = window.claude;
+  const db = c ? await c.use("db") : null;
+  if (!db) { S.unavailable = true; render(); return; }
+  S.db = db;
+  c.use("sample").then((s) => { S.sample = s; });
+  c.use("mcp").then((m) => { S.mcp = m; }).catch(() => {});
+  let remembered = null;
+  try { remembered = localStorage.getItem("pf-selected"); } catch {}
+  db.collection("feeds").orderBy("createdAt", "desc").onSnapshot((snap) => {
+    S.feeds = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    S.loaded = true;
+    for (const f of S.feeds) if (!isBusy(f)) S.fired.delete(f.id);
+    if (!S.selected || !S.feeds.some((f) => f.id === S.selected)) {
+      const pick = S.feeds.find((f) => f.id === remembered) || S.feeds[0];
+      if (pick) { select(pick.id); return; }
+      S.selected = null;
+    }
+    render();
+  }, () => { S.unavailable = true; render(); });
+})();
+</script>
